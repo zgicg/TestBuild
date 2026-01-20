@@ -1,4 +1,4 @@
-name: Xcode - Build and Analyze
+name: Xcode - Build and Archive IPA
 
 on:
   push:
@@ -8,23 +8,50 @@ on:
 
 jobs:
   build:
-    name: Build and analyse default scheme using xcodebuild command
+    name: Build and Archive IPA
     runs-on: macos-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
+
       - name: Set Default Scheme
         run: |
           scheme_list=$(xcodebuild -list -json | tr -d "\n")
           default=$(echo $scheme_list | ruby -e "require 'json'; puts JSON.parse(STDIN.gets)['project']['targets'][0]")
           echo $default | cat >default
-          echo Using default scheme: $default
-      - name: Build
-        env:
-          scheme: ${{ 'default' }}
+          echo "Using default scheme: $default"
+
+      - name: Install Dependencies (if needed)
         run: |
-          if [ $scheme = default ]; then scheme=$(cat default); fi
-          if [ "`ls -A | grep -i \\.xcworkspace\$`" ]; then filetype_parameter="workspace" && file_to_build="`ls -A | grep -i \\.xcworkspace\$`"; else filetype_parameter="project" && file_to_build="`ls -A | grep -i \\.xcodeproj\$`"; fi
+          if [ -f "Podfile" ]; then
+            gem install cocoapods
+            pod install
+          fi
+
+      - name: Archive the app
+        env:
+          scheme: ${{ steps.set_default_scheme.outputs.scheme }}
+        run: |
+          # 确定 workspace 或 project 文件
+          if [ "`ls -A | grep -i \.xcworkspace\$`" ]; then
+            filetype_parameter="workspace" && file_to_build="`ls -A | grep -i \.xcworkspace\$`"
+          else
+            filetype_parameter="project" && file_to_build="`ls -A | grep -i \.xcodeproj\$`"
+          fi
+
           file_to_build=`echo $file_to_build | awk '{$1=$1;print}'`
-          xcodebuild clean build analyze -scheme "$scheme" -"$filetype_parameter" "$file_to_build" | xcpretty && exit ${PIPESTATUS[0]}
+
+          # 确定设备或模拟器
+          destination='platform=iOS, name=iPhone 14'  # 或根据需要修改为实际目标设备
+
+          # 构建 archive
+          xcodebuild clean archive -scheme "$scheme" -"$filetype_parameter" "$file_to_build" -destination "$destination" -archivePath $PWD/build/MyApp.xcarchive | xcpretty
+
+      - name: Export IPA
+        run: |
+          # 使用 xcodebuild 导出 IPA
+          xcodebuild -exportArchive -archivePath $PWD/build/MyApp.xcarchive -exportPath $PWD/build -exportOptionsPlist exportOptions.plist
+          
+          # 输出 ipa 文件路径
+          echo "IPA has been exported to: $PWD/build"
