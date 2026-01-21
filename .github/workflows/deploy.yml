@@ -14,6 +14,12 @@
         - name: Checkout
           uses: actions/checkout@v4
 
+        - name: Debug Secrets
+          run: |
+            echo "Key ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}"
+            echo "Issuer ID: ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}"
+            echo "Key Base64 length: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64.length }}"
+
         - name: Build and Sign IPA
           uses: mxcl/xcodebuild@v3
           with:
