@@ -49,9 +49,12 @@ jobs:
           EOF
 
           xcodebuild -exportArchive \
-            -archivePath ./build.xcarchive \
-            -exportPath ./TestBuild.ipa \
-            -exportOptionsPlist ExportOptions.plist
+            -archivePath "${PWD}/build.xcarchive" \
+            -exportPath "${PWD}/TestBuild.ipa" \
+            -exportOptionsPlist ExportOptions.plist \
+            -authenticationKeyPath "${PWD}/AuthKey.p8" \
+            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
 
       - name: Upload to App Store Connect
         run: |
