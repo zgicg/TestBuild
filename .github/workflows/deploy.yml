@@ -25,10 +25,12 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "${PWD}/build.xcarchive" \
+            CODE_SIGN_IDENTITY="Apple Development" \
+            -allowProvisioningDeviceRegistration \
+            -allowProvisioningUpdates \
             -authenticationKeyPath "${PWD}/AuthKey.p8" \
             -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }} \
-            DEVELOPMENT_TEAM=${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
 
       - name: Export IPA
         run: |
