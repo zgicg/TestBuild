@@ -21,7 +21,7 @@
             echo "Key Base64 length: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64.length }}"
 
         - name: Build and Sign IPA
-          uses: zgicg/xcodebuild@main
+          uses: zgicg/xcodebuild@master
           with:
             action: build-for-testing
             platform: iOS
