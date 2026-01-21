@@ -16,12 +16,18 @@ jobs:
 
       - name: Build Archive
         run: |
+          # 解码 p8 密钥文件
+          echo "${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}" | base64 -d > AuthKey.p8
+
           xcodebuild archive \
             -project TestBuild.xcodeproj \
             -scheme TestBuild \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath ./build.xcarchive \
+            -authenticationKeyPath ./AuthKey.p8 \
+            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }} \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
@@ -35,7 +41,7 @@ jobs:
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store</string>
+              <string>app-store-connect</string>
               <key>signingStyle</key>
               <string>automatic</string>
           </dict>
