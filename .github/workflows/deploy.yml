@@ -1,67 +1,55 @@
-  name: Build and Upload to App Store
+name: Build and Upload to App Store
 
-  on:
-    workflow_dispatch:
-    push:
-      branches:
-        - main
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
-  jobs:
-    build-and-upload:
-      runs-on: macos-latest
+jobs:
+  build-and-upload:
+    runs-on: macos-latest
 
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-        - name: Build and Sign IPA
-          uses: zgicg/xcodebuild@master
-          with:
-            action: build
-            platform: iOS
-            configuration: Release
-            scheme: TestBuild
-            authentication-key-base64: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}
-            authentication-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-            authentication-key-issuer-id: ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
+      - name: Build Archive
+        run: |
+          xcodebuild archive \
+            -project TestBuild.xcodeproj \
+            -scheme TestBuild \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath ./build.xcarchive \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
 
-        - name: Export IPA
-          run: |
-            # 获取 xcresult 中的 archive
-            ARCHIVE_PATH=$(find . -name "*.xcarchive" -type d | head -1)
-            echo "Archive path: $ARCHIVE_PATH"
+      - name: Export IPA
+        run: |
+          # 创建 ExportOptions.plist
+          cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
 
-            # 创建 ExportOptions.plist
-            cat > ExportOptions.plist << EOF
-            <?xml version="1.0" encoding="UTF-8"?>
-            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            <plist version="1.0">
-            <dict>
-                <key>method</key>
-                <string>app-store</string>
-                <key>signingStyle</key>
-                <string>automatic</string>
-                <key>uploadBitcode</key>
-                <true/>
-            </dict>
-            </plist>
-            EOF
+          xcodebuild -exportArchive \
+            -archivePath ./build.xcarchive \
+            -exportPath ./TestBuild.ipa \
+            -exportOptionsPlist ExportOptions.plist
 
-            # 导出 IPA
-            xcodebuild \
-              -exportArchive \
-              -archivePath "$ARCHIVE_PATH" \
-              -exportPath TestBuild.ipa \
-              -exportOptionsPlist ExportOptions.plist
-
-        - name: Upload to App Store Connect
-          run: |
-            xcrun altool --upload-app \
-              -f TestBuild.ipa/TestBuild.ipa \
-              --apiKey ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-              --apiIssuer ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
-
-        - name: Show Result
-          run: |
-            echo "✅ IPA 已成功上传到 App Store Connect"
-            echo "请登录 https://appstoreconnect.apple.com 提交审核"
+      - name: Upload to App Store Connect
+        run: |
+          xcrun altool --upload-app \
+            -f TestBuild.ipa/TestBuild.ipa \
+            --apiKey ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
+            --apiIssuer ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
