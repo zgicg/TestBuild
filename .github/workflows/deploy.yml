@@ -16,8 +16,11 @@ jobs:
 
       - name: Build Archive
         run: |
-          # 解码 p8 密钥文件 (使用绝对路径)
-          echo "${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}" | base64 -d > "${PWD}/AuthKey.p8"
+          # 解码 p8 密钥文件到 altool 期望的位置
+          key_dir="${HOME}/.appstoreconnect/private_keys"
+          key_path="${key_dir}/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8"
+          mkdir -p "${key_dir}"
+          echo "${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}" | base64 -d > "${key_path}"
 
           xcodebuild archive \
             -project TestBuild.xcodeproj \
@@ -29,7 +32,7 @@ jobs:
             DEVELOPMENT_TEAM=${{ secrets.APP_STORE_CONNECT_TEAM_ID }} \
             -allowProvisioningDeviceRegistration \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "${PWD}/AuthKey.p8" \
+            -authenticationKeyPath "${key_path}" \
             -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
 
@@ -56,7 +59,7 @@ jobs:
             -exportPath "${PWD}/TestBuild.ipa" \
             -exportOptionsPlist ExportOptions.plist \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "${PWD}/AuthKey.p8" \
+            -authenticationKeyPath "${HOME}/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8" \
             -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
 
@@ -64,5 +67,6 @@ jobs:
         run: |
           xcrun altool --upload-app \
             -f TestBuild.ipa/TestBuild.ipa \
+            -t ios \
             --apiKey ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
             --apiIssuer ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
