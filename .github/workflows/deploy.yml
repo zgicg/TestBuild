@@ -26,6 +26,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "${PWD}/build.xcarchive" \
             CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=${{ secrets.APP_STORE_CONNECT_TEAM_ID }} \
             -allowProvisioningDeviceRegistration \
             -allowProvisioningUpdates \
@@ -42,7 +43,7 @@ jobs:
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store-connect</string>
+              <string>app-store</string>
               <key>signingStyle</key>
               <string>automatic</string>
               <key>teamID</key>
@@ -55,6 +56,7 @@ jobs:
             -archivePath "${PWD}/build.xcarchive" \
             -exportPath "${PWD}/TestBuild.ipa" \
             -exportOptionsPlist ExportOptions.plist \
+            -allowProvisioningUpdates \
             -authenticationKeyPath "${PWD}/AuthKey.p8" \
             -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
