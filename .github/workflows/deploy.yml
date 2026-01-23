@@ -26,7 +26,6 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "${PWD}/build.xcarchive" \
             CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=${{ secrets.APP_STORE_CONNECT_TEAM_ID }} \
             -allowProvisioningDeviceRegistration \
             -allowProvisioningUpdates \
