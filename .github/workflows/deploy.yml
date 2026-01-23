@@ -14,27 +14,49 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Signing Assets
+        run: |
+          keychain="${RUNNER_TEMP}/build.keychain-db"
+          keychain_password="$(uuidgen)"
+          cert_path="${RUNNER_TEMP}/distribution.p12"
+          profile_path="${RUNNER_TEMP}/profile.mobileprovision"
+
+          echo "${{ secrets.APP_STORE_DISTRIBUTION_CERT_BASE64 }}" | base64 -d > "${cert_path}"
+          echo "${{ secrets.APP_STORE_DISTRIBUTION_PROFILE_BASE64 }}" | base64 -d > "${profile_path}"
+
+          security create-keychain -p "${keychain_password}" "${keychain}"
+          security set-keychain-settings -lut 21600 "${keychain}"
+          security unlock-keychain -p "${keychain_password}" "${keychain}"
+          security import "${cert_path}" -P "${{ secrets.APP_STORE_DISTRIBUTION_CERT_PASSWORD }}" -A -t cert -f pkcs12 -k "${keychain}"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${keychain_password}" "${keychain}"
+          security list-keychains -d user -s "${keychain}"
+          security default-keychain -s "${keychain}"
+
+          profile_plist="$(security cms -D -i "${profile_path}")"
+          profile_uuid="$(printf '%s' "${profile_plist}" | /usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin)"
+          profile_name="$(printf '%s' "${profile_plist}" | /usr/libexec/PlistBuddy -c 'Print Name' /dev/stdin)"
+          profile_app_id="$(printf '%s' "${profile_plist}" | /usr/libexec/PlistBuddy -c 'Print Entitlements:application-identifier' /dev/stdin)"
+          bundle_id="${profile_app_id#*.}"
+
+          profiles_dir="${HOME}/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "${profiles_dir}"
+          cp "${profile_path}" "${profiles_dir}/${profile_uuid}.mobileprovision"
+
+          echo "PROFILE_NAME=${profile_name}" >> "${GITHUB_ENV}"
+          echo "BUNDLE_ID=${bundle_id}" >> "${GITHUB_ENV}"
+
       - name: Build Archive
         run: |
-          # 解码 p8 密钥文件到 altool 期望的位置
-          key_dir="${HOME}/.appstoreconnect/private_keys"
-          key_path="${key_dir}/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8"
-          mkdir -p "${key_dir}"
-          echo "${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}" | base64 -d > "${key_path}"
-
           xcodebuild archive \
             -project TestBuild.xcodeproj \
             -scheme TestBuild \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "${PWD}/build.xcarchive" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="${PROFILE_NAME}" \
             DEVELOPMENT_TEAM=${{ secrets.APP_STORE_CONNECT_TEAM_ID }} \
-            -allowProvisioningDeviceRegistration \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "${key_path}" \
-            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
 
       - name: Export IPA
         run: |
@@ -45,9 +67,14 @@ jobs:
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store</string>
+              <string>app-store-connect</string>
               <key>signingStyle</key>
-              <string>automatic</string>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>${BUNDLE_ID}</key>
+                  <string>${PROFILE_NAME}</string>
+              </dict>
               <key>teamID</key>
               <string>${{ secrets.APP_STORE_CONNECT_TEAM_ID }}</string>
           </dict>
@@ -57,11 +84,14 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath "${PWD}/build.xcarchive" \
             -exportPath "${PWD}/TestBuild.ipa" \
-            -exportOptionsPlist ExportOptions.plist \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "${HOME}/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8" \
-            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
+            -exportOptionsPlist ExportOptions.plist
+
+      - name: Prepare App Store Connect API Key
+        run: |
+          key_dir="${HOME}/.appstoreconnect/private_keys"
+          key_path="${key_dir}/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8"
+          mkdir -p "${key_dir}"
+          echo "${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}" | base64 -d > "${key_path}"
 
       - name: Upload to App Store Connect
         run: |
