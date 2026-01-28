@@ -16,7 +16,12 @@ jobs:
 
       - name: Set Build Number
         run: |
-          xcrun agvtool new-version -all "${GITHUB_RUN_ID}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version_tag="${GITHUB_REF_NAME}"
+          else
+            version_tag="${GITHUB_RUN_ID}"
+          fi
+          xcrun agvtool new-version -all "${version_tag}"
 
       - name: Install Signing Assets
         run: |
