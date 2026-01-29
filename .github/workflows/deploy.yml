@@ -14,14 +14,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set Build Number
+      - name: Set Version
         run: |
+          build_number="${GITHUB_RUN_NUMBER}"
+          xcrun agvtool new-version -all "${build_number}"
+
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version_tag="${GITHUB_REF_NAME}"
-          else
-            version_tag="${GITHUB_RUN_ID}"
+            xcrun agvtool new-marketing-version "${version_tag}"
           fi
-          xcrun agvtool new-version -all "${version_tag}"
 
       - name: Install Signing Assets
         run: |
@@ -109,3 +110,17 @@ jobs:
             -t ios \
             --apiKey ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
             --apiIssuer ${{ secrets.APP_STORE_CONNECT_KEY_ISSUER_ID }}
+
+      - name: Notify DingTalk
+        if: always()
+        working-directory: .github/workflows
+        env:
+          DINGTALK_WEBHOOK_URL: ${{ secrets.DINGTALK_WEBHOOK_URL }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [[ "${JOB_STATUS}" == "success" ]]; then
+            bash ./dingtalk-notify.sh success
+          else
+            bash ./dingtalk-notify.sh failure
+          fi
